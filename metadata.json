@@ -1,0 +1,8 @@
+{
+  "name": "AI Asset Sprint",
+  "description": "Transform a single keyword into a complete, professionally designed lead magnet package (Ebook, Cover, Bonuses) in minutes using advanced Gemini AI models.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}

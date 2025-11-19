@@ -1,3 +1,4 @@
+
 export enum GenerationStatus {
   IDLE = 'IDLE',
   RESEARCHING = 'RESEARCHING', // Gemini 3 Pro Thinking
@@ -14,16 +15,49 @@ export interface AssetChapter {
   content: string;
 }
 
+export interface BonusItem {
+  title: string;
+  description: string;
+  icon: string;
+  value: string;
+}
+
+export interface Workbook {
+  title: string;
+  description: string;
+  icon: string;
+  value: string;
+  sections: string[];
+}
+
+export interface OTO {
+  title: string;
+  description: string;
+  icon: string;
+  price: string;
+  originalPrice: string;
+  bullets: string[];
+}
+
+export interface ValueStack {
+  bonuses: BonusItem[];
+  workbook: Workbook;
+  oto: OTO;
+}
+
 export interface AssetPackage {
   id: string;
   keyword: string;
   title: string;
   subtitle: string;
   targetAudience: string;
+  // Hormozi Offer Details
+  painPoints: string[];
+  dreamOutcome: string;
   coverImageBase64: string | null;
   coverImagePrompt: string;
   chapters: AssetChapter[];
-  bonuses: string[];
+  valueStack: ValueStack; // New complex structure
   createdAt: Date;
 }
 

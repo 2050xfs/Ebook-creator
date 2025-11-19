@@ -1,19 +1,27 @@
+
 import React, { useState } from 'react';
-import { Rocket, Zap, Layout, Settings, PlusCircle } from 'lucide-react';
+import { Rocket, Zap, Layout, PlusCircle } from 'lucide-react';
 import { Button } from './components/ui/Button';
-import { Card } from './components/ui/Card';
 import { GenerationProgress } from './components/GenerationProgress';
 import { Editor } from './components/Editor';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AssetPackage, GenerationStatus, GenerationStep, AssetChapter } from './types';
-import { generateAssetStrategy, generateChapterContent, generateCoverImage } from './services/geminiService';
+import { 
+  performMarketResearch, 
+  generateTitleAndOutline, 
+  writeChapter, 
+  generateCoverImage, 
+  generateValueStack 
+} from './services/geminiService';
 
-const INITIAL_STEPS: GenerationStep[] = [
-  { id: 1, label: 'Market Research & Strategy (Gemini 3 Pro Thinking)', status: 'pending' },
-  { id: 2, label: 'Structuring $100M Offer', status: 'pending' },
-  { id: 3, label: 'Drafting Core Chapters', status: 'pending' },
-  { id: 4, label: 'Generating Cover Art (Imagen 4)', status: 'pending' },
-  { id: 5, label: 'Compiling Asset Package', status: 'pending' },
+const PIPELINE_STEPS: GenerationStep[] = [
+  { id: 1, label: 'Analyzing Market Pain Points (Gemini 3 Pro)', status: 'pending' },
+  { id: 2, label: 'Engineering $100M Hormozi Offer', status: 'pending' },
+  { id: 3, label: 'Constructing Strategic Outline', status: 'pending' },
+  { id: 4, label: 'Designing Premium Cover Art (Imagen 4)', status: 'pending' },
+  { id: 5, label: 'Drafting High-Conversion Content', status: 'pending' },
+  { id: 6, label: 'Building Value Stack (Bonuses & OTO)', status: 'pending' },
+  { id: 7, label: 'Finalizing Asset Package', status: 'pending' },
 ];
 
 function App() {
@@ -31,60 +39,70 @@ function App() {
     setActiveStep(1);
 
     try {
-      // Step 1: Strategy (Thinking Mode)
-      const strategy = await generateAssetStrategy(keyword);
-      setActiveStep(2);
-      setStatus(GenerationStatus.STRUCTURING);
-
-      await new Promise(r => setTimeout(r, 1000)); // UX pause
+      // --- STEP 1 & 2: Research & Offer ---
+      // We combine these into one heavy "Thinking" call for coherence
+      const researchData = await performMarketResearch(keyword);
       
-      // Step 2 & 3: Drafting Content
       setActiveStep(3);
-      setStatus(GenerationStatus.DRAFTING);
-      
-      const chapters: AssetChapter[] = [];
-      const rawChapters = strategy.chapters || [];
+      setStatus(GenerationStatus.STRUCTURING);
+      await new Promise(r => setTimeout(r, 800)); // UX pacing
 
-      // Parallel generation for speed (chunking to avoid rate limits if needed, here we do simple parallel)
-      const chapterPromises = rawChapters.map((chap: any) => 
-        generateChapterContent(chap.title, chap.brief, strategy.targetAudience)
+      // --- STEP 3: Title & Outline ---
+      const structureData = await generateTitleAndOutline(keyword, researchData);
+      
+      setActiveStep(4);
+      setStatus(GenerationStatus.DESIGNING);
+
+      // --- STEP 4: Cover Art ---
+      const coverPrompt = structureData.coverImagePrompt || `Minimalist cover for ${structureData.selectedTitle}, ${keyword}`;
+      // Start cover generation in background while we do other things? No, keep it linear for the progress bar drama.
+      const coverImage = await generateCoverImage(coverPrompt, '3:4');
+
+      setActiveStep(5);
+      setStatus(GenerationStatus.DRAFTING);
+
+      // --- STEP 5: Drafting Content ---
+      const chapters: AssetChapter[] = [];
+      const outline = structureData.outline || [];
+
+      // Parallel generation for speed
+      const chapterPromises = outline.map((section: any) => 
+        writeChapter(section.title, section.bullets, structureData.selectedTitle)
       );
       
       const contents = await Promise.all(chapterPromises);
       
       contents.forEach((content, index) => {
         chapters.push({
-          title: rawChapters[index].title,
+          title: outline[index].title,
           content: content || "Content generation failed."
         });
       });
 
-      // Step 4: Cover Image
-      setActiveStep(4);
-      setStatus(GenerationStatus.DESIGNING);
-      
-      const coverPrompt = strategy.coverImageIdea || `Minimalist cover for ${strategy.title}`;
-      const coverImage = await generateCoverImage(coverPrompt, '3:4');
+      setActiveStep(6);
+      // --- STEP 6: Value Stack ---
+      const valueStack = await generateValueStack(structureData.selectedTitle, keyword);
 
-      // Step 5: Finalize
-      setActiveStep(5);
+      setActiveStep(7);
       setStatus(GenerationStatus.FINALIZING);
+      await new Promise(r => setTimeout(r, 1000));
 
       const newAsset: AssetPackage = {
         id: Date.now().toString(),
         keyword,
-        title: strategy.title || "Untitled Asset",
-        subtitle: strategy.subtitle || "A Complete Guide",
-        targetAudience: strategy.targetAudience || "General Audience",
+        title: structureData.selectedTitle || "Untitled Asset",
+        subtitle: structureData.subtitle || "A Complete Guide",
+        targetAudience: researchData.hormoziOffer?.dreamOutcome || "General Audience",
+        painPoints: researchData.painPoints || [],
+        dreamOutcome: researchData.hormoziOffer?.dreamOutcome || "",
         coverImageBase64: coverImage,
         coverImagePrompt: coverPrompt,
         chapters,
-        bonuses: strategy.bonuses || [],
+        valueStack: valueStack,
         createdAt: new Date()
       };
 
       setGeneratedAsset(newAsset);
-      await new Promise(r => setTimeout(r, 800));
       
       setView('editor');
       setStatus(GenerationStatus.COMPLETED);
@@ -128,15 +146,15 @@ function App() {
           <div className="max-w-4xl mx-auto px-6 py-20 text-center">
              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium mb-8">
                 <Zap size={12} fill="currentColor" />
-                POWERED BY GEMINI 2.5 FLASH & IMAGEN 4
+                POWERED BY GEMINI 3 PRO & IMAGEN 4
              </div>
              
              <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white via-slate-200 to-slate-500">
-               Unleash Your Next <br/> Masterpiece.
+               Build a $100M Offer <br/> in 3 Minutes.
              </h1>
              
              <p className="text-lg text-slate-400 mb-12 max-w-2xl mx-auto">
-               Transform a single keyword into a fully designed lead magnet, ebook, or course asset in under 3 minutes. Strategy, content, and design—automated.
+               Transforms a single keyword into a complete commercial asset: Ebook, Cover Art, Value Stack (Bonuses + Workbook + OTO), and Sales Strategy.
              </p>
 
              <div className="max-w-2xl mx-auto relative group">
@@ -149,12 +167,12 @@ function App() {
                     type="text" 
                     value={keyword}
                     onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="Enter a niche or topic (e.g. 'Keto Meal Prep', 'SaaS Marketing')..." 
+                    placeholder="Enter your niche (e.g. 'Wedding Photography', 'Keto Diet')..." 
                     className="flex-1 bg-transparent border-none focus:ring-0 text-lg text-white placeholder-slate-500 h-12"
                     onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
                   />
                   <Button size="lg" onClick={handleGenerate} disabled={!keyword}>
-                    Generate Asset
+                    Start Sprint
                   </Button>
                </div>
              </div>
@@ -162,9 +180,9 @@ function App() {
              {/* Templates / Examples */}
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-24 text-left">
                 {[
-                  { title: "Course Workbooks", desc: "Structured lessons & exercises", color: "from-blue-500/20 to-cyan-500/20" },
-                  { title: "Lead Magnets", desc: "High-conversion PDF guides", color: "from-purple-500/20 to-pink-500/20" },
-                  { title: "Strategy Docs", desc: "Action plans & checklists", color: "from-orange-500/20 to-red-500/20" }
+                  { title: "Pain Point Analysis", desc: "Deep dive into customer psychology", color: "from-blue-500/20 to-cyan-500/20" },
+                  { title: "Value Stacking", desc: "Bonuses, OTOs & Workbooks included", color: "from-purple-500/20 to-pink-500/20" },
+                  { title: "Commercial License", desc: "Sell directly to your audience", color: "from-orange-500/20 to-red-500/20" }
                 ].map((item, i) => (
                   <div key={i} className={`p-6 rounded-xl border border-slate-800 bg-gradient-to-br ${item.color} backdrop-blur hover:border-slate-600 transition-colors cursor-pointer`}>
                     <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
@@ -177,7 +195,7 @@ function App() {
 
         {view === 'generating' && (
           <div className="flex items-center justify-center min-h-[80vh]">
-            <GenerationProgress steps={INITIAL_STEPS} currentStepId={activeStep} />
+            <GenerationProgress steps={PIPELINE_STEPS} currentStepId={activeStep} />
           </div>
         )}
 

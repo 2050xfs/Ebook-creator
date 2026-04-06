@@ -66,7 +66,18 @@ export const performMarketResearch = async (keyword: string) => {
  * STEP 4 & 5: Title & Outline
  * Uses the research context to build the structure.
  */
-export const generateTitleAndOutline = async (keyword: string, researchData: any) => {
+interface ResearchData {
+  painPoints: string[];
+  solutions: string[];
+  hormoziOffer: {
+    dreamOutcome: string;
+    perceivedLikelihood: string;
+    timeDelay: string;
+    effortSacrifice: string;
+  };
+}
+
+export const generateTitleAndOutline = async (keyword: string, researchData: ResearchData) => {
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview', // Continuing with Pro for structural logic
